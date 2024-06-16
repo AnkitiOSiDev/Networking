@@ -20,22 +20,3 @@ public extension ApiServiceProtocol {
         }
     }
 }
-
-//
-//protocol NetworkMGR {
-//    func request<Model>(request: ApiRequestable, parser: @escaping (Data) throws -> Void, completion: @escaping (Result<Model, NetworkError>) -> Void )
-//}
-//
-//protocol ApiServable {
-//
-//}
-//
-//extension ApiServiceProtocol1 {
-//    func getData<Model: ResponseBody>(request: ApiRequestable, parser: ResponseParser<Model>, completion: @escaping (Result<Model, NetworkError>) -> Void )
-//}
-//
-//protocol ApiReqsble {
-//    var url: URL? {get}
-//
-//}
-//

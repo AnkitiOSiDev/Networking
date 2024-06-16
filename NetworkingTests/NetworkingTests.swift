@@ -223,6 +223,64 @@ class NetworkingTests: XCTestCase {
         wait(for: [expectation], timeout: 5.0)
 
     }
+    
+//    func testNetworkManager_Failure_NoData() {
+//
+//        let url = URL(string: "https://github.com/endpint")!
+//        URLProtocolMock.mockURLs = [url: (nil, nil, response)]
+//
+//        let sessionConfiguration = URLSessionConfiguration.ephemeral
+//        sessionConfiguration.protocolClasses = [URLProtocolMock.self]
+//        let mockSession = URLSession(configuration: sessionConfiguration)
+//
+//        let networkManager = NetworkManager(session: mockSession)
+//        let request = MockUrlRequest.test
+//        let parser = ResponseParser<MockUser>()
+//        let expectation = XCTestExpectation(description: "test Network manager")
+//        let mockApiService = MockApiService(networkManager: networkManager)
+//
+//        mockApiService.getData(endpoint: request, parser: parser) { result in
+//            switch result {
+//            case .success(let model):
+//                XCTAssertNil(model)
+//                break
+//            case .failure(let error):
+//                XCTAssertNotNil(error)
+//                XCTAssertEqual(error, .noData)
+//            }
+//            expectation.fulfill()
+//        }
+//        wait(for: [expectation], timeout: 5.0)
+//
+//    }
+    
+    func test_apierror() {
+        let url = URL(string: "https://github.com/endpint")!
+        URLProtocolMock.mockURLs = [url: (nil, nil, nil)]
+
+        let sessionConfiguration = URLSessionConfiguration.ephemeral
+        sessionConfiguration.protocolClasses = [URLProtocolMock.self]
+        let mockSession = URLSession(configuration: sessionConfiguration)
+
+        let networkManager = NetworkManager(session: mockSession)
+        let request = MockUrlRequest.test
+        let parser = ResponseParser<MockUser>()
+        let expectation = XCTestExpectation(description: "test Network manager")
+        let mockApiService = MockApiService(networkManager: networkManager)
+        
+        mockApiService.getData(endpoint: request, parser: parser) { result in
+                   switch result {
+                   case .success(let model):
+                       XCTAssertNil(model)
+                       break
+                   case .failure(let error):
+                       XCTAssertNotNil(error)
+                       XCTAssertEqual(error, .noData)
+                   }
+                   expectation.fulfill()
+        }
+        wait(for: [expectation], timeout: 5.0)
+    }
 }
 
 enum MockUrlRequest: ApiRequestable {
@@ -278,7 +336,6 @@ struct MockUser: ResponseBody, RequestBody {
 }
 
 class URLProtocolMock: URLProtocol {
-    /// Dictionary maps URLs to tuples of error, data, and response
     static var mockURLs = [URL?: (error: Error?, data: Data?, response: HTTPURLResponse?)]()
 
     override class func canInit(with request: URLRequest) -> Bool {
@@ -286,25 +343,20 @@ class URLProtocolMock: URLProtocol {
     }
 
     override class func canonicalRequest(for request: URLRequest) -> URLRequest {
-        // Required to be implemented here. Just return what is passed
         return request
     }
 
     override func startLoading() {
         if let url = request.url {
             if let (error, data, response) = URLProtocolMock.mockURLs[url] {
-                
-                // We have a mock response specified so return it.
                 if let responseStrong = response {
-                    self.client?.urlProtocol(self, didReceive: responseStrong, cacheStoragePolicy: .notAllowed)
+                    client?.urlProtocol(self, didReceive: responseStrong, cacheStoragePolicy: .notAllowed)
                 }
                 
-                // We have mocked data specified so return it.
                 if let dataStrong = data {
                     self.client?.urlProtocol(self, didLoad: dataStrong)
                 }
                 
-                // We have a mocked error so return it.
                 if let errorStrong = error {
                     self.client?.urlProtocol(self, didFailWithError: errorStrong)
                 }
@@ -329,3 +381,49 @@ class MockApiService: ApiServiceProtocol {
 }
 
 struct MockError: Error {}
+
+class MockUrlSession: URLSession {
+    var data: Data?
+    var response: URLResponse?
+    var error: Error?
+    
+    override func dataTask(with request: URLRequest, completionHandler: @escaping (Data?, URLResponse?, Error?) -> Void) -> URLSessionDataTask {
+        MockSessionDataTask.init {
+            completionHandler(self.data, self.response, self.error)
+        }
+    }
+}
+
+class MockSessionDataTask: URLSessionDataTask {
+    let closure: () -> Void
+    
+    init(closure: @escaping () -> Void) {
+        self.closure = closure
+    }
+    
+    
+    override func resume() {
+        self.closure()
+    }
+}
+
+
+protocol URLSessionProtocol {
+    func dataTask(with: URLRequest, completionHandler: @escaping (Data?, URLResponse?, Error?) -> Void) -> URLSessionDataTask
+}
+
+extension URLSession: URLSessionProtocol { }
+
+class MockableUrlSession: URLSessionProtocol {
+    var data: Data?
+    var urlResponse: URLResponse?
+    var error: Error?
+    
+    func dataTask(with: URLRequest, completionHandler: @escaping (Data?, URLResponse?, Error?) -> Void) -> URLSessionDataTask {
+        return URLSession.init(configuration: .default).dataTask(with: with) { _,_,_  in
+            completionHandler(self.data, self.urlResponse, self.error)
+        }
+    }
+}
+
+class MockUrlDataTask: URLSessionDataTask { }
